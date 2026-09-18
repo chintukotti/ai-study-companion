@@ -137,7 +137,7 @@ export const processDocument = async (documentId: string, userId?: string) => {
     // 9. Update document and job to ready/completed
     await supabaseAdmin
       .from('documents')
-      .update({ status: 'ready' })
+      .update({ status: 'ready', error_message: null })
       .eq('id', documentId);
 
     await jobUpdate('completed', 100, {
