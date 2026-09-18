@@ -23,8 +23,14 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173' }));
+// Allow configured CORS origin or wildcard in production if set
+const allowedOrigin = process.env.CORS_ORIGIN || '*';
+app.use(cors({ origin: allowedOrigin === '*' ? true : allowedOrigin, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
+
+// Health check endpoints for hosting providers (Render/Railway/Vercel)
+app.get('/health', (_req, res) => res.status(200).json({ status: 'ok', uptime: process.uptime() }));
+app.get('/', (_req, res) => res.status(200).json({ message: 'AI Study Companion API is running' }));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/spaces', spaceRoutes);
