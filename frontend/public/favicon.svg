@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563eb" />
+      <stop offset="100%" stop-color="#4f46e5" />
+    </linearGradient>
+    <linearGradient id="starGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fde047" />
+      <stop offset="100%" stop-color="#f59e0b" />
+    </linearGradient>
+  </defs>
+  <!-- Rounded Base Background Tile -->
+  <rect width="32" height="32" rx="8" fill="url(#bgGrad)" />
+  
+  <!-- Left Book Page -->
+  <path d="M6 10.5C6 9.4 6.9 8.5 8 8.5C10.5 8.5 13.5 9.5 15.5 11V23C13.5 21.5 10.5 20.5 8 20.5C6.9 20.5 6 21.4 6 22.5V10.5Z" fill="#ffffff" fill-opacity="0.95" />
+  
+  <!-- Right Book Page -->
+  <path d="M26 10.5C26 9.4 25.1 8.5 24 8.5C21.5 8.5 18.5 9.5 16.5 11V23C18.5 21.5 21.5 20.5 24 20.5C25.1 20.5 26 21.4 26 22.5V10.5Z" fill="#ffffff" fill-opacity="0.95" />
+  
+  <!-- Center Book Spine Line -->
+  <line x1="16" y1="10.5" x2="16" y2="23" stroke="#3b82f6" stroke-width="1.5" stroke-linecap="round" />
+  
+  <!-- AI Sparkle / Star at top right -->
+  <path d="M24 4L24.8 6.2L27 7L24.8 7.8L24 10L23.2 7.8L21 7L23.2 6.2L24 4Z" fill="url(#starGrad)" />
+</svg>
