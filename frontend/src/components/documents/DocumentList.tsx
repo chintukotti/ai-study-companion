@@ -1,11 +1,12 @@
 import React from 'react';
-import { useDocuments } from '@/hooks/useDocuments';
-import { FileText, Trash2, Upload } from 'lucide-react';
+import { useDocuments, useDeleteDocument } from '@/hooks/useDocuments';
+import { FileText, Trash2, Upload, AlertCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ProcessingStatus } from './ProcessingStatus';
 
 export const DocumentList = ({ projectId }: { projectId: string }) => {
   const { data: documents, isLoading, isError, error } = useDocuments(projectId);
+  const deleteDoc = useDeleteDocument(projectId);
 
   if (isLoading) {
     return (
@@ -44,13 +45,13 @@ export const DocumentList = ({ projectId }: { projectId: string }) => {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'uploading':
-        return <span className="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">Uploading</span>;
+        return <span className="px-2 py-0.5 text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 rounded-full">Uploading</span>;
       case 'processing':
-        return <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full animate-pulse">Processing</span>;
+        return <span className="px-2 py-0.5 text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 rounded-full animate-pulse">Processing</span>;
       case 'ready':
-        return <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">Ready</span>;
+        return <span className="px-2 py-0.5 text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full">Ready</span>;
       case 'failed':
-        return <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">Failed</span>;
+        return <span className="px-2 py-0.5 text-xs font-semibold bg-red-50 text-red-700 border border-red-200 rounded-full">Failed</span>;
       default:
         return null;
     }
@@ -59,23 +60,39 @@ export const DocumentList = ({ projectId }: { projectId: string }) => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {documents.map((doc: any) => (
-        <div key={doc.id} className="p-4 bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow flex flex-col">
+        <div key={doc.id} className="p-4 bg-white rounded-xl border border-gray-200 shadow-xs hover:shadow-sm transition-shadow flex flex-col">
           <div className="flex items-start justify-between">
             <div className="flex items-center space-x-3">
-              <div className="p-2 bg-blue-50 text-blue-500 rounded-lg">
-                <FileText className="w-6 h-6" />
+              <div className="p-2 bg-blue-50 text-blue-600 rounded-lg shrink-0">
+                <FileText className="w-5 h-5" />
               </div>
-              <div>
-                <h4 className="font-semibold text-gray-900 truncate max-w-[150px]" title={doc.title}>{doc.title}</h4>
+              <div className="min-w-0">
+                <h4 className="font-semibold text-gray-900 truncate max-w-[170px]" title={doc.title}>{doc.title}</h4>
                 <p className="text-xs text-gray-500">{formatSize(doc.file_size ?? doc.size ?? 0)}</p>
               </div>
             </div>
-            <button className="text-gray-400 hover:text-red-500 transition-colors">
+            <button
+              onClick={() => {
+                if (window.confirm(`Delete "${doc.title}"?`)) {
+                  deleteDoc.mutate(doc.id);
+                }
+              }}
+              disabled={deleteDoc.isPending}
+              className="text-gray-400 hover:text-red-500 transition-colors p-1"
+              title="Delete Document"
+            >
               <Trash2 className="w-4 h-4" />
             </button>
           </div>
+
+          {doc.status === 'failed' && (
+            <div className="mt-2.5 p-2 rounded-lg bg-red-50 border border-red-100 flex items-start gap-1.5 text-xs text-red-700">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-red-500" />
+              <span className="line-clamp-2 leading-tight">{doc.error_message || 'Processing timed out while service was waking up. Please re-upload.'}</span>
+            </div>
+          )}
           
-          <div className="mt-4 flex items-center justify-between mt-auto pt-4 border-t border-gray-100">
+          <div className="mt-3 flex items-center justify-between mt-auto pt-3 border-t border-gray-100">
             {getStatusBadge(doc.status)}
             <span className="text-xs text-gray-500">
               {(doc.page_count ?? doc.pageCount) ? `${doc.page_count ?? doc.pageCount} pages • ` : ''}
@@ -83,7 +100,7 @@ export const DocumentList = ({ projectId }: { projectId: string }) => {
             </span>
           </div>
 
-          {doc.status === 'processing' && (
+          {(doc.status === 'processing' || doc.status === 'uploading') && (
             <div className="mt-3">
               <ProcessingStatus documentId={doc.id} />
             </div>

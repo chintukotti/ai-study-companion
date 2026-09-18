@@ -10,6 +10,11 @@ export const useDocuments = (projectId: string | undefined) => {
       return data;
     },
     enabled: !!projectId,
+    refetchInterval: (query) => {
+      const docs = query.state.data as Array<{ status: string }> | undefined;
+      const isBusy = docs?.some((d) => d.status === 'processing' || d.status === 'uploading');
+      return isBusy ? 3000 : false;
+    },
   });
 };
 
@@ -48,3 +53,19 @@ export const useDocumentStatus = (docId: string | undefined) => {
     },
   });
 };
+
+export const useDeleteDocument = (projectId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (documentId: string) => {
+      const { data } = await api.delete(`/documents/${documentId}`);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['documents', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['projectAnalytics'] });
+      queryClient.invalidateQueries({ queryKey: ['globalAnalytics'] });
+    },
+  });
+};
+
