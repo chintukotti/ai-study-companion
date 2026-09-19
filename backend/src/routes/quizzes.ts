@@ -25,28 +25,67 @@ router.post('/projects/:projectId/quizzes/generate', validateBody(generateSchema
     const { topic, type, difficulty, questionCount } = req.body;
     const { projectId } = req.params;
 
-    // Get context from vector search
-    let chunks: any[] = [];
-    try {
-      const queryEmbedding = await embedQuery(topic || 'core concepts and overview', req.user.id);
-      chunks = await retrieveRelevantChunks({ queryEmbedding, projectId, threshold: 0.45, limit: 12 });
-    } catch (embErr) {
-      console.warn('Vector retrieval warning:', embErr);
+    // 1. Verify project has uploaded documents
+    const { data: projectDocs, error: docError } = await supabaseAdmin
+      .from('documents')
+      .select('id, title, status')
+      .eq('project_id', projectId);
+
+    if (docError) throw docError;
+
+    if (!projectDocs || projectDocs.length === 0) {
+      return res.status(400).json({
+        error: 'No PDF uploaded',
+        message: 'No PDF uploaded. Quizzes can only be generated from uploaded study materials. Please upload a PDF first.'
+      });
     }
 
-    // Fallback: If similarity threshold yielded no chunks, fetch actual document chunks directly
-    if (!chunks || chunks.length === 0) {
-      const { data: directChunks } = await supabaseAdmin
-        .from('document_chunks')
-        .select('*')
-        .eq('project_id', projectId)
-        .limit(10);
-      if (directChunks && directChunks.length > 0) {
-        chunks = directChunks;
+    const readyDocs = projectDocs.filter(d => d.status === 'ready');
+    if (readyDocs.length === 0) {
+      return res.status(400).json({
+        error: 'Documents still processing',
+        message: 'Your uploaded documents are still processing. Please wait until they are ready before generating a quiz.'
+      });
+    }
+
+    // 2. Fetch direct chunks from project documents
+    const { data: directChunks, error: chunkErr } = await supabaseAdmin
+      .from('document_chunks')
+      .select('*')
+      .eq('project_id', projectId)
+      .limit(15);
+
+    if (chunkErr) throw chunkErr;
+
+    if (!directChunks || directChunks.length === 0) {
+      return res.status(400).json({
+        error: 'No document content available',
+        message: 'No text chunks available from your uploaded documents to generate questions.'
+      });
+    }
+
+    // 3. Retrieve relevant chunks if topic specified
+    let chunks: any[] = [];
+    if (topic && topic.trim()) {
+      try {
+        const queryEmbedding = await embedQuery(topic.trim(), req.user.id);
+        chunks = await retrieveRelevantChunks({ queryEmbedding, projectId, threshold: 0.4, limit: 12 });
+      } catch (embErr) {
+        console.warn('Vector retrieval warning:', embErr);
       }
     }
 
+    if (!chunks || chunks.length === 0) {
+      chunks = directChunks;
+    }
+
     const context = buildContext(chunks || []);
+    if (!context || context.trim().length === 0) {
+      return res.status(400).json({
+        error: 'No context available',
+        message: 'Unable to extract study context from your documents to generate questions.'
+      });
+    }
     const masteryData = await getProjectMastery(projectId, req.user.id);
 
     const questions = await generateQuiz({

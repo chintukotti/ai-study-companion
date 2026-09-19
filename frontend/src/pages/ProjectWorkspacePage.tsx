@@ -130,6 +130,7 @@ export const ProjectWorkspacePage = () => {
                   <QuizGenerator
                     projectId={currentProjectId}
                     onQuizGenerated={(newQuizId) => setActiveQuizId(newQuizId)}
+                    onGoToDocuments={() => handleTabChange('documents')}
                   />
                   <QuizHistory
                     projectId={currentProjectId}

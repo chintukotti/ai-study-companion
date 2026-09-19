@@ -57,7 +57,16 @@ export const DocumentUpload = ({ projectId, onUploadComplete }: { projectId: str
         if (onUploadComplete) onUploadComplete();
       },
       onError: (err: any) => {
-        setError(err.message || 'An error occurred during upload.');
+        const serverMsg = err.response?.data?.error || err.response?.data?.message;
+        if (serverMsg) {
+          setError(serverMsg);
+        } else if (err.message?.includes('aborted') || err.message?.includes('Network Error')) {
+          setError('Upload connection was interrupted or server is waking up. Please try again.');
+        } else if (err.response?.status === 404) {
+          setError('Upload endpoint not found. Please refresh and try again.');
+        } else {
+          setError(err.message || 'An error occurred during upload.');
+        }
       }
     });
   };

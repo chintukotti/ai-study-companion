@@ -46,10 +46,15 @@ export const generateQuiz = async (params: QuizParams) => {
     ? "Every question must have type 'open_ended', with options as an empty array and correct_option_index as null."
     : "Mix of 'mcq' (with 4 options and correct_option_index) and 'open_ended' questions.";
 
-  const systemPrompt = `You are an expert academic tutor creating a quiz.
-Generate a ${params.difficulty} difficulty quiz with exactly ${params.count} questions based on the following material:
-Topic: ${params.topic || 'General Material'}
-Context:
+  const systemPrompt = `You are an expert academic tutor creating a quiz STRICTLY based on the provided document excerpts.
+
+CRITICAL GROUNDING RULES:
+1. Every single question, multiple choice option, correct answer, and explanation MUST be directly and strictly derived from the Document Context provided below.
+2. DO NOT invent questions or test outside general knowledge that is not supported by the Document Context.
+3. Every question MUST cite real page numbers in page_references matching the pages indicated in the Document Context.
+
+Topic: ${params.topic || 'Core concepts from the uploaded documents'}
+Document Context:
 ${params.context}
 
 Quiz Type Rules: ${typeInstruction}

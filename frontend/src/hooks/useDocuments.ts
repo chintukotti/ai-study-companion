@@ -22,11 +22,7 @@ export const useUploadDocument = (projectId: string) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (formData: FormData) => {
-      const { data } = await api.post(`/projects/${projectId}/documents`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      const { data } = await api.post(`/projects/${projectId}/documents`, formData);
       return data;
     },
     onSuccess: () => {

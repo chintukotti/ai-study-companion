@@ -25,9 +25,9 @@ router.post('/projects/:projectId/documents', upload.single('file'), async (req,
     }
 
     // Look up project to get space_id
-    const { data: project, error: projError } = await req.supabase!
+    const { data: project, error: projError } = await supabaseAdmin
       .from('projects')
-      .select('space_id')
+      .select('id, space_id')
       .eq('id', projectId)
       .single();
 
@@ -91,13 +91,14 @@ router.post('/projects/:projectId/documents', upload.single('file'), async (req,
 
 router.get('/projects/:projectId/documents', async (req, res, next) => {
   try {
-    const { data, error } = await req.supabase!
+    const { data, error } = await supabaseAdmin
       .from('documents')
       .select('*')
-      .eq('project_id', req.params.projectId);
+      .eq('project_id', req.params.projectId)
+      .order('created_at', { ascending: false });
 
     if (error) throw error;
-    res.json(data);
+    res.json(data || []);
   } catch (err) {
     next(err);
   }
@@ -105,7 +106,7 @@ router.get('/projects/:projectId/documents', async (req, res, next) => {
 
 router.get('/documents/:id', async (req, res, next) => {
   try {
-    const { data, error } = await req.supabase!
+    const { data, error } = await supabaseAdmin
       .from('documents')
       .select('*')
       .eq('id', req.params.id)
@@ -120,9 +121,9 @@ router.get('/documents/:id', async (req, res, next) => {
 
 router.get('/documents/:id/status', async (req, res, next) => {
   try {
-    const { data, error } = await req.supabase!
+    const { data, error } = await supabaseAdmin
       .from('documents')
-      .select('status, id')
+      .select('status, id, error_message')
       .eq('id', req.params.id)
       .single();
 
@@ -135,17 +136,20 @@ router.get('/documents/:id/status', async (req, res, next) => {
 
 router.delete('/documents/:id', async (req, res, next) => {
   try {
-    const { data: doc } = await req.supabase!
+    const { data: doc } = await supabaseAdmin
       .from('documents')
-      .select('file_path')
+      .select('file_path, project_id')
       .eq('id', req.params.id)
       .single();
 
     if (doc?.file_path) {
-      await req.supabase!.storage.from('documents').remove([doc.file_path]);
+      await supabaseAdmin.storage.from('documents').remove([doc.file_path]);
     }
 
-    const { error } = await req.supabase!
+    await supabaseAdmin.from('document_chunks').delete().eq('document_id', req.params.id);
+    await supabaseAdmin.from('processing_jobs').delete().eq('document_id', req.params.id);
+
+    const { error } = await supabaseAdmin
       .from('documents')
       .delete()
       .eq('id', req.params.id);
