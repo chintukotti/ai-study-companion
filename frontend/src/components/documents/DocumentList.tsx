@@ -1,12 +1,36 @@
+import { useState } from 'react';
 import { useDocuments, useDeleteDocument, useRetryDocument } from '@/hooks/useDocuments';
-import { FileText, Trash2, Upload, AlertCircle, RotateCw } from 'lucide-react';
+import { FileText, Trash2, Upload, AlertCircle, RotateCw, Download } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ProcessingStatus } from './ProcessingStatus';
+import api from '@/lib/api';
 
 export const DocumentList = ({ projectId }: { projectId: string }) => {
   const { data: documents, isLoading, isError, error } = useDocuments(projectId);
   const deleteDoc = useDeleteDocument(projectId);
   const retryDoc = useRetryDocument(projectId);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  const handleDownload = async (doc: any) => {
+    try {
+      setDownloadingId(doc.id);
+      const { data } = await api.get(`/documents/${doc.id}/download`);
+      if (data?.downloadUrl) {
+        const link = document.createElement('a');
+        link.href = data.downloadUrl;
+        link.setAttribute('download', doc.title || 'document.pdf');
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } catch (err: any) {
+      console.error('Download error:', err);
+      alert('Failed to download document. Please try again.');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -72,11 +96,23 @@ export const DocumentList = ({ projectId }: { projectId: string }) => {
               </div>
             </div>
             <div className="flex items-center gap-1 shrink-0">
+              <button
+                onClick={() => handleDownload(doc)}
+                disabled={downloadingId === doc.id}
+                className="text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors p-1.5 rounded-lg"
+                title="Download PDF"
+              >
+                {downloadingId === doc.id ? (
+                  <RotateCw className="w-4 h-4 animate-spin text-blue-600" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+              </button>
               {doc.status === 'failed' && (
                 <button
                   onClick={() => retryDoc.mutate(doc.id)}
                   disabled={retryDoc.isPending}
-                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-colors p-1 rounded"
+                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-colors p-1.5 rounded-lg"
                   title="Retry Processing"
                 >
                   <RotateCw className={`w-4 h-4 ${retryDoc.isPending ? 'animate-spin' : ''}`} />
@@ -89,7 +125,7 @@ export const DocumentList = ({ projectId }: { projectId: string }) => {
                   }
                 }}
                 disabled={deleteDoc.isPending}
-                className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded"
+                className="text-gray-400 hover:text-red-500 transition-colors p-1.5 rounded-lg"
                 title="Delete Document"
               >
                 <Trash2 className="w-4 h-4" />

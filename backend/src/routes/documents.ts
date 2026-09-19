@@ -132,6 +132,47 @@ router.get('/documents/:id/status', async (req, res, next) => {
   }
 });
 
+router.get('/documents/:id/download', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const { data: doc, error: docErr } = await supabaseAdmin
+      .from('documents')
+      .select('title, file_path, file_type')
+      .eq('id', id)
+      .single();
+
+    if (docErr || !doc) return res.status(404).json({ error: 'Document not found' });
+
+    // Try generating high-speed signed download URL from Supabase Storage (valid for 1 hour)
+    const { data: signedData, error: signError } = await supabaseAdmin.storage
+      .from('documents')
+      .createSignedUrl(doc.file_path, 3600, {
+        download: doc.title || 'document.pdf',
+      });
+
+    if (!signError && signedData?.signedUrl) {
+      return res.json({ downloadUrl: signedData.signedUrl, filename: doc.title });
+    }
+
+    // Direct stream fallback
+    const { data: fileData, error: downloadError } = await supabaseAdmin.storage
+      .from('documents')
+      .download(doc.file_path);
+
+    if (downloadError || !fileData) {
+      return res.status(500).json({ error: 'Failed to retrieve file from storage' });
+    }
+
+    const buffer = Buffer.from(await fileData.arrayBuffer());
+    res.setHeader('Content-Type', doc.file_type || 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(doc.title || 'document.pdf')}"`);
+    res.send(buffer);
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.delete('/documents/:id', async (req, res, next) => {
   try {
     const { data: doc } = await supabaseAdmin
