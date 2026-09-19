@@ -159,4 +159,43 @@ router.delete('/documents/:id', async (req, res, next) => {
   }
 });
 
+router.post('/documents/:id/retry', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const { data: doc, error: docErr } = await supabaseAdmin
+      .from('documents')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (docErr || !doc) return res.status(404).json({ error: 'Document not found' });
+
+    // Reset status to processing
+    await supabaseAdmin
+      .from('documents')
+      .update({ status: 'processing', error_message: null })
+      .eq('id', id);
+
+    // Reset processing job
+    await supabaseAdmin
+      .from('processing_jobs')
+      .upsert({
+        document_id: id,
+        status: 'queued',
+        progress: 10,
+        attempts: 0,
+        error_message: null,
+        started_at: new Date().toISOString(),
+      }, { onConflict: 'document_id' });
+
+    // Enqueue document into sequential processing queue
+    documentQueue.enqueue(id, req.user?.id || doc.created_by);
+
+    res.json({ message: 'Document retry initiated', status: 'processing' });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

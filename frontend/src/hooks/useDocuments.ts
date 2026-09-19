@@ -65,3 +65,18 @@ export const useDeleteDocument = (projectId: string) => {
   });
 };
 
+export const useRetryDocument = (projectId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (documentId: string) => {
+      const { data } = await api.post(`/documents/${documentId}/retry`);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['documents', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['projectAnalytics'] });
+      queryClient.invalidateQueries({ queryKey: ['globalAnalytics'] });
+    },
+  });
+};
+

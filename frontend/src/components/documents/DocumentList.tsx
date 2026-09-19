@@ -1,12 +1,12 @@
-import React from 'react';
-import { useDocuments, useDeleteDocument } from '@/hooks/useDocuments';
-import { FileText, Trash2, Upload, AlertCircle } from 'lucide-react';
+import { useDocuments, useDeleteDocument, useRetryDocument } from '@/hooks/useDocuments';
+import { FileText, Trash2, Upload, AlertCircle, RotateCw } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ProcessingStatus } from './ProcessingStatus';
 
 export const DocumentList = ({ projectId }: { projectId: string }) => {
   const { data: documents, isLoading, isError, error } = useDocuments(projectId);
   const deleteDoc = useDeleteDocument(projectId);
+  const retryDoc = useRetryDocument(projectId);
 
   if (isLoading) {
     return (
@@ -71,24 +71,48 @@ export const DocumentList = ({ projectId }: { projectId: string }) => {
                 <p className="text-xs text-gray-500">{formatSize(doc.file_size ?? doc.size ?? 0)}</p>
               </div>
             </div>
-            <button
-              onClick={() => {
-                if (window.confirm(`Delete "${doc.title}"?`)) {
-                  deleteDoc.mutate(doc.id);
-                }
-              }}
-              disabled={deleteDoc.isPending}
-              className="text-gray-400 hover:text-red-500 transition-colors p-1"
-              title="Delete Document"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-1 shrink-0">
+              {doc.status === 'failed' && (
+                <button
+                  onClick={() => retryDoc.mutate(doc.id)}
+                  disabled={retryDoc.isPending}
+                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-colors p-1 rounded"
+                  title="Retry Processing"
+                >
+                  <RotateCw className={`w-4 h-4 ${retryDoc.isPending ? 'animate-spin' : ''}`} />
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  if (window.confirm(`Delete "${doc.title}"?`)) {
+                    deleteDoc.mutate(doc.id);
+                  }
+                }}
+                disabled={deleteDoc.isPending}
+                className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded"
+                title="Delete Document"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
           {doc.status === 'failed' && (
-            <div className="mt-2.5 p-2 rounded-lg bg-red-50 border border-red-100 flex items-start gap-1.5 text-xs text-red-700">
-              <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-red-500" />
-              <span className="line-clamp-2 leading-tight">{doc.error_message || 'Processing timed out while service was waking up. Please re-upload.'}</span>
+            <div className="mt-2.5 p-2.5 rounded-lg bg-red-50 border border-red-100 flex flex-col gap-2 text-xs text-red-700">
+              <div className="flex items-start gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-red-500" />
+                <span className="line-clamp-2 leading-tight">
+                  {doc.error_message || 'Processing timed out while service was waking up.'}
+                </span>
+              </div>
+              <button
+                onClick={() => retryDoc.mutate(doc.id)}
+                disabled={retryDoc.isPending}
+                className="self-start inline-flex items-center gap-1.5 text-xs font-semibold bg-white border border-red-200 text-red-700 hover:bg-red-50 px-2.5 py-1 rounded-md shadow-2xs transition-colors"
+              >
+                <RotateCw className={`w-3 h-3 ${retryDoc.isPending ? 'animate-spin' : ''}`} />
+                Retry Processing
+              </button>
             </div>
           )}
           

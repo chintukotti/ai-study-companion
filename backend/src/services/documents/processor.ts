@@ -20,7 +20,12 @@ export const processDocument = async (documentId: string, userId?: string) => {
       .eq('document_id', documentId);
 
     if (existingChunks && existingChunks > 0) {
-      console.log(`Document ${documentId} already has ${existingChunks} chunks. Skipping.`);
+      console.log(`Document ${documentId} already has ${existingChunks} chunks. Marking ready.`);
+      await supabaseAdmin
+        .from('documents')
+        .update({ status: 'ready', error_message: null })
+        .eq('id', documentId);
+      await jobUpdate('completed', 100);
       return;
     }
 
@@ -36,7 +41,7 @@ export const processDocument = async (documentId: string, userId?: string) => {
     // 3. Update status to processing
     await supabaseAdmin
       .from('documents')
-      .update({ status: 'processing' })
+      .update({ status: 'processing', error_message: null })
       .eq('id', documentId);
 
     // Create or update processing job
@@ -61,28 +66,46 @@ export const processDocument = async (documentId: string, userId?: string) => {
 
     await jobUpdate('processing', 20);
 
-    // 5. Send to Python service for text extraction + chunking
+    // 5. Send to Python service for text extraction + chunking with automatic cold-start retries
     const pythonServiceUrl = process.env.PYTHON_SERVICE_URL || 'http://127.0.0.1:8000';
     const fileBuffer = Buffer.from(await fileData.arrayBuffer());
 
-    const formData = new FormData();
-    formData.append('file', fileBuffer, {
-      filename: doc.title.endsWith('.pdf') ? doc.title : `${doc.title}.pdf`,
-      contentType: 'application/pdf',
-    });
-    formData.append('chunk_size', '1000');
-    formData.append('chunk_overlap', '150');
+    let pyResponse: any = null;
+    const maxHttpRetries = 4;
 
-    const pyResponse = await axios.post(
-      `${pythonServiceUrl}/api/v1/process`,
-      formData,
-      {
-        headers: formData.getHeaders(),
-        timeout: 120000, // 2 minutes for large PDFs
-        maxContentLength: Infinity,
-        maxBodyLength: Infinity,
+    for (let attempt = 1; attempt <= maxHttpRetries; attempt++) {
+      try {
+        const formData = new FormData();
+        formData.append('file', fileBuffer, {
+          filename: doc.title.endsWith('.pdf') ? doc.title : `${doc.title}.pdf`,
+          contentType: 'application/pdf',
+        });
+        formData.append('chunk_size', '1000');
+        formData.append('chunk_overlap', '150');
+
+        console.log(`📡 Sending document ${documentId} to Python microservice (Attempt ${attempt}/${maxHttpRetries})...`);
+        pyResponse = await axios.post(
+          `${pythonServiceUrl}/api/v1/process`,
+          formData,
+          {
+            headers: formData.getHeaders(),
+            timeout: 120000, // 2 minutes for large PDFs
+            maxContentLength: Infinity,
+            maxBodyLength: Infinity,
+          }
+        );
+        break; // Successfully processed by Python service
+      } catch (httpErr: any) {
+        const status = httpErr.response?.status;
+        const isColdStart = status === 502 || status === 503 || httpErr.code === 'ECONNREFUSED' || httpErr.code === 'ETIMEDOUT';
+        if (isColdStart && attempt < maxHttpRetries) {
+          console.log(`⏳ Python service is waking up from idle sleep (Status ${status || httpErr.code}). Waiting 15s before retry ${attempt + 1}...`);
+          await new Promise(res => setTimeout(res, 15000));
+        } else {
+          throw httpErr;
+        }
       }
-    );
+    }
 
     const { total_pages, chunks } = pyResponse.data;
 
