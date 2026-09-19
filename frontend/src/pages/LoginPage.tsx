@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { BookOpen, ShieldCheck, User, Lock } from "lucide-react"
+import { BookOpen, ShieldCheck, User, Lock, KeyRound } from "lucide-react"
 
 export function LoginPage() {
   const location = useLocation()
@@ -123,6 +123,68 @@ export function LoginPage() {
               ? "Sign in with platform administrator credentials" 
               : "Sign in to your AI Study Companion workspace"}
           </p>
+        </div>
+
+        {/* Quick Demo & Testing Credentials Card */}
+        <div className="mb-5 p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+              <KeyRound className="w-3.5 h-3.5 text-amber-500" /> Demo & Testing Accounts
+            </span>
+            <span className="text-[10px] text-slate-400 font-medium">Click to auto-fill</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            {/* Student Account */}
+            <button
+              type="button"
+              onClick={() => {
+                setIsAdminMode(false);
+                setEmail("chintukotti79@gmail.com");
+                setPassword("adminn");
+                setError("");
+              }}
+              className={`p-2.5 rounded-lg border text-left transition-all ${
+                !isAdminMode && email === "chintukotti79@gmail.com"
+                  ? "bg-blue-50/80 border-blue-300 ring-1 ring-blue-300 shadow-2xs"
+                  : "bg-white border-slate-200 hover:border-blue-300 hover:bg-blue-50/30"
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-bold text-blue-700 flex items-center gap-1">
+                  <User className="w-3 h-3 text-blue-600" /> Student
+                </span>
+                <span className="text-[10px] bg-blue-100 text-blue-700 font-semibold px-1.5 py-0.5 rounded">Auto-fill</span>
+              </div>
+              <p className="text-[11px] text-slate-700 truncate font-mono">chintukotti79@gmail.com</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">Password: <span className="font-mono font-semibold text-slate-800">adminn</span></p>
+            </button>
+
+            {/* Admin Account */}
+            <button
+              type="button"
+              onClick={() => {
+                setIsAdminMode(true);
+                setEmail("chintukotti78@gmail.com");
+                setPassword("adminn");
+                setError("");
+              }}
+              className={`p-2.5 rounded-lg border text-left transition-all ${
+                isAdminMode && email === "chintukotti78@gmail.com"
+                  ? "bg-purple-50/80 border-purple-300 ring-1 ring-purple-300 shadow-2xs"
+                  : "bg-white border-slate-200 hover:border-purple-300 hover:bg-purple-50/30"
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-bold text-purple-700 flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3 text-purple-600" /> Admin
+                </span>
+                <span className="text-[10px] bg-purple-100 text-purple-700 font-semibold px-1.5 py-0.5 rounded">Auto-fill</span>
+              </div>
+              <p className="text-[11px] text-slate-700 truncate font-mono">chintukotti78@gmail.com</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">Password: <span className="font-mono font-semibold text-slate-800">adminn</span></p>
+            </button>
+          </div>
         </div>
 
         {error && (
