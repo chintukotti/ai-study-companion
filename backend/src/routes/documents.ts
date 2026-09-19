@@ -3,7 +3,7 @@ import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
 import multer from 'multer';
 import { supabaseAdmin } from '../lib/supabase.js';
-import { processDocument } from '../services/documents/processor.js';
+import { processDocument, documentQueue } from '../services/documents/processor.js';
 import { trackEvent } from '../services/analytics/events.js';
 
 const router = Router();
@@ -70,10 +70,8 @@ router.post('/projects/:projectId/documents', upload.single('file'), async (req,
       idempotency_key: `process-${docId}`,
     });
 
-    // Trigger async processing (fire and forget)
-    processDocument(docId, req.user!.id).catch(err => {
-      console.error(`Background processing failed for ${docId}:`, err.message);
-    });
+    // Trigger async sequential processing queue (processes automatically one PDF by PDF)
+    documentQueue.enqueue(docId, req.user!.id);
 
     trackEvent({
       userId: req.user!.id,

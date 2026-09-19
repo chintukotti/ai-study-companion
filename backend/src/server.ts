@@ -55,8 +55,16 @@ for (const { path: subPath, route } of routeModules) {
   }
 }
 
+import { recoverPendingDocuments } from './services/documents/processor.js';
+
 app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
+  // Recover any uncompleted document processing jobs automatically on boot
+  recoverPendingDocuments().catch(err => console.warn('Boot recovery error:', err));
+  // Keep alive / check every 60s for any stuck jobs
+  setInterval(() => {
+    recoverPendingDocuments().catch(() => {});
+  }, 60000);
 });

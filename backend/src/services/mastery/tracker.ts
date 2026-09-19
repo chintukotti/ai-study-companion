@@ -78,25 +78,27 @@ export const updateMasteryFromQuiz = async (attemptId: string) => {
       const newScore = (scores.correct / scores.total) * 100;
 
       if (existing) {
-        // Exponential moving average (70% old, 30% new)
-        const newMastery = Math.round(existing.mastery_level * 0.7 + newScore * 0.3);
+        const totalAttempts = existing.total_attempts + scores.total;
+        const correctAttempts = existing.correct_attempts + scores.correct;
+        const accurateMastery = totalAttempts > 0 ? Math.round((correctAttempts / totalAttempts) * 100) : 0;
         await supabaseAdmin
           .from('concept_mastery')
           .update({
-            mastery_level: newMastery,
-            total_attempts: existing.total_attempts + scores.total,
-            correct_attempts: existing.correct_attempts + scores.correct,
+            mastery_level: accurateMastery,
+            total_attempts: totalAttempts,
+            correct_attempts: correctAttempts,
             last_assessed_at: new Date().toISOString(),
           })
           .eq('id', existing.id);
       } else {
+        const initialMastery = scores.total > 0 ? Math.round((scores.correct / scores.total) * 100) : 0;
         await supabaseAdmin
           .from('concept_mastery')
           .insert({
             concept_id: concept.id,
             user_id: userId,
             project_id: projectId,
-            mastery_level: newScore,
+            mastery_level: initialMastery,
             total_attempts: scores.total,
             correct_attempts: scores.correct,
             last_assessed_at: new Date().toISOString(),

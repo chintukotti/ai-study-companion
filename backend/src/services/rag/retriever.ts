@@ -34,11 +34,12 @@ export const retrieveRelevantChunks = async (params: RetrieveParams): Promise<Re
   return (data || []) as RetrievedChunk[];
 };
 
-export const buildContext = (chunks: RetrievedChunk[]): string => {
+export const buildContext = (chunks: RetrievedChunk[], docTitleMap?: Map<string, string>): string => {
   if (!chunks || chunks.length === 0) {
     return 'No relevant document context found.';
   }
   return chunks.map((chunk, i) => {
-    return `--- Chunk ${i + 1} [Document: ${chunk.document_id}, Page ${chunk.page_number}, Similarity: ${(chunk.similarity * 100).toFixed(1)}%] ---\n${chunk.content}`;
+    const docName = docTitleMap?.get(chunk.document_id) || 'PDF Document';
+    return `--- Chunk ${i + 1} [PDF Document: "${docName}", Document ID: ${chunk.document_id}, Page: ${chunk.page_number}, Similarity: ${(chunk.similarity * 100).toFixed(1)}%] ---\n${chunk.content}`;
   }).join('\n\n');
 };

@@ -182,10 +182,6 @@ export const processDocument = async (documentId: string, userId?: string) => {
 
     if (job && job.attempts < job.max_attempts) {
       console.log(`Scheduling retry ${job.attempts + 1}/${job.max_attempts} for ${documentId}`);
-      setTimeout(() => {
-        processDocument(documentId, userId);
-      }, Math.pow(2, job.attempts) * 5000); // Exponential backoff: 5s, 10s, 20s
-
       await supabaseAdmin
         .from('processing_jobs')
         .update({ attempts: job.attempts + 1, status: 'queued' })
@@ -195,6 +191,72 @@ export const processDocument = async (documentId: string, userId?: string) => {
         .from('documents')
         .update({ status: 'processing' })
         .eq('id', documentId);
+
+      setTimeout(() => {
+        documentQueue.enqueue(documentId, userId);
+      }, Math.pow(2, job.attempts) * 4000); // 4s, 8s, 16s
     }
   }
 };
+
+/**
+ * Sequential processing queue to process PDFs automatically one by one.
+ * Prevents memory exhaustion on free-tier microservices and guarantees ordered execution.
+ */
+class DocumentProcessingQueue {
+  private queue: Array<{ documentId: string; userId?: string }> = [];
+  private isProcessing = false;
+
+  public enqueue(documentId: string, userId?: string) {
+    if (!this.queue.some(item => item.documentId === documentId)) {
+      this.queue.push({ documentId, userId });
+      console.log(`📥 Enqueued document ${documentId} for sequential processing. Queue length: ${this.queue.length}`);
+    }
+    this.processNext();
+  }
+
+  private async processNext() {
+    if (this.isProcessing || this.queue.length === 0) {
+      return;
+    }
+
+    this.isProcessing = true;
+    const { documentId, userId } = this.queue.shift()!;
+
+    try {
+      console.log(`🚀 Processing queued document ${documentId} (remaining in queue: ${this.queue.length})...`);
+      await processDocument(documentId, userId);
+    } catch (err: any) {
+      console.error(`Error in queue processing document ${documentId}:`, err.message);
+    } finally {
+      this.isProcessing = false;
+      // Small pause between documents to let memory and CPU settle
+      setTimeout(() => this.processNext(), 1500);
+    }
+  }
+}
+
+export const documentQueue = new DocumentProcessingQueue();
+
+/**
+ * Recovers any documents stuck in 'uploading' or 'processing' state upon server startup or heartbeat
+ */
+export const recoverPendingDocuments = async () => {
+  try {
+    const { data: pendingDocs } = await supabaseAdmin
+      .from('documents')
+      .select('id, created_by, status')
+      .in('status', ['uploading', 'processing'])
+      .order('created_at', { ascending: true });
+
+    if (pendingDocs && pendingDocs.length > 0) {
+      console.log(`🔄 Auto-recovery: Enqueuing ${pendingDocs.length} pending documents to process sequentially.`);
+      for (const doc of pendingDocs) {
+        documentQueue.enqueue(doc.id, doc.created_by);
+      }
+    }
+  } catch (err: any) {
+    console.warn('Document auto-recovery check error:', err.message);
+  }
+};
+

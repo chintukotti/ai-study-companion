@@ -42,22 +42,33 @@ export const MessageBubble = ({ message }: { message: Message }) => {
         </div>
 
         {message.citations && message.citations.length > 0 && !isUser && (
-          <div className="flex flex-wrap gap-2 mt-1">
+          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+            <span className="text-[11px] font-semibold text-slate-400 mr-1 flex items-center gap-1">
+              Sources:
+            </span>
             {message.citations.map((cite: any, i: number) => {
               const pageNum = cite.page ?? cite.page_number;
               const quoteText = cite.text || cite.quote;
+              const docName = cite.document_title || cite.documentTitle || cite.doc_title || 'Document.pdf';
               return (
                 <div 
                   key={i} 
-                  className="group relative flex items-center bg-orange-50 text-orange-700 text-xs font-medium px-2.5 py-1 rounded-full border border-orange-200 cursor-help"
+                  className="group relative flex items-center bg-blue-50 text-blue-800 text-xs font-medium px-2.5 py-1 rounded-lg border border-blue-200/80 cursor-help hover:bg-blue-100 transition-colors shadow-2xs"
                 >
-                  <FileText className="w-3.5 h-3.5 mr-1 text-orange-500" />
-                  Page {pageNum}
+                  <FileText className="w-3.5 h-3.5 mr-1.5 text-blue-600 shrink-0" />
+                  <span className="font-semibold text-slate-800 mr-1 max-w-[170px] truncate" title={docName}>
+                    {docName}
+                  </span>
+                  <span className="text-blue-600 font-semibold shrink-0">p. {pageNum}</span>
                   
                   {/* Tooltip */}
                   {quoteText && (
-                    <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block w-72 p-2.5 bg-gray-900 text-white text-xs rounded-lg shadow-xl z-20 pointer-events-none">
-                      "{quoteText}"
+                    <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block w-80 p-3 bg-slate-900 text-white text-xs rounded-xl shadow-xl z-20 pointer-events-none leading-relaxed border border-slate-700">
+                      <p className="font-bold text-blue-300 mb-1 border-b border-slate-800 pb-1 flex items-center justify-between">
+                        <span className="truncate mr-2">{docName}</span>
+                        <span className="text-blue-400 shrink-0">Page {pageNum}</span>
+                      </p>
+                      <p className="italic text-slate-300 text-[11px]">"{quoteText}"</p>
                     </div>
                   )}
                 </div>

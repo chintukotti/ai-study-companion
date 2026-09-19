@@ -128,29 +128,56 @@ export const getGlobalAnalytics = async (userId: string) => {
 
   // 6. Areas requiring attention (concepts with lowest mastery or < 70%)
   const areasRequiringAttention = conceptMasteryRows
-    .filter((m) => Number(m.mastery_level) < 70)
+    .filter((m) => {
+      const lvl = m.total_attempts > 0
+        ? Math.round((m.correct_attempts / m.total_attempts) * 100)
+        : Number(m.mastery_level);
+      return lvl < 70;
+    })
     .slice(0, 4)
     .map((m) => {
       const proj = projectList.find(p => p.id === m.project_id);
+      const lvl = m.total_attempts > 0
+        ? Math.round((m.correct_attempts / m.total_attempts) * 100)
+        : Number(m.mastery_level);
       return {
         id: m.id,
         conceptId: m.concept_id,
         conceptName: m.concepts?.name || 'Key Concept',
-        masteryLevel: Number(m.mastery_level),
+        masteryLevel: lvl,
         totalAttempts: m.total_attempts,
         correctAttempts: m.correct_attempts,
         projectId: m.project_id,
         projectName: proj?.name || 'Project',
-        recommendation: Number(m.mastery_level) < 30
+        recommendation: lvl < 30
           ? 'Review fundamentals in your study materials and ask the AI Tutor for simpler explanations.'
           : 'Practice with a targeted quiz to reinforce this concept.'
       };
     });
 
-  // 7. Recommended Topics to Learn (combines concepts needing attention + in progress + mastered)
-  const recommendedTopics = conceptMasteryRows.map((m) => {
+  // 7. Recommended Topics to Learn — strictly shows concepts needing study / low score
+  // Filters for concepts needing attention (< 75% score), sorted from lowest to highest score
+  const weakConcepts = conceptMasteryRows
+    .map((m) => {
+      const lvl = m.total_attempts > 0
+        ? Math.round((m.correct_attempts / m.total_attempts) * 100)
+        : Number(m.mastery_level);
+      return { ...m, calculatedMastery: lvl };
+    })
+    .sort((a, b) => a.calculatedMastery - b.calculatedMastery)
+    .filter((m) => m.calculatedMastery < 75);
+
+  // If student has weak concepts, recommend those. If all are > 75%, pick lowest 3 for reinforcement.
+  const targetConcepts = weakConcepts.length > 0
+    ? weakConcepts
+    : conceptMasteryRows
+        .map(m => ({ ...m, calculatedMastery: m.total_attempts > 0 ? Math.round((m.correct_attempts / m.total_attempts) * 100) : Number(m.mastery_level) }))
+        .sort((a, b) => a.calculatedMastery - b.calculatedMastery)
+        .slice(0, 3);
+
+  const recommendedTopics = targetConcepts.map((m) => {
     const proj = projectList.find(p => p.id === m.project_id);
-    const lvl = Number(m.mastery_level);
+    const lvl = m.calculatedMastery;
     let status: 'attention' | 'review' | 'mastered' = 'review';
     let action = 'Review with Tutor';
     let actionTab = 'tutor';
@@ -158,13 +185,13 @@ export const getGlobalAnalytics = async (userId: string) => {
       status = 'attention';
       action = 'Study Topic';
       actionTab = 'tutor';
-    } else if (lvl >= 80) {
-      status = 'mastered';
-      action = 'Practice Advanced Quiz';
-      actionTab = 'quizzes';
-    } else {
+    } else if (lvl < 75) {
       status = 'review';
       action = 'Take Practice Quiz';
+      actionTab = 'quizzes';
+    } else {
+      status = 'mastered';
+      action = 'Practice Advanced Quiz';
       actionTab = 'quizzes';
     }
 
@@ -183,13 +210,29 @@ export const getGlobalAnalytics = async (userId: string) => {
   // 8. Continue Learning Hero Item (most recent project and document)
   const activeProject = projectList.length > 0 ? projectList[0] : null;
   const activeDoc = recentDocs.length > 0 ? recentDocs[0] : null;
+
+  // Calculate project-specific overall mastery for the active course
+  const activeProjMasteryRows = activeProject
+    ? conceptMasteryRows.filter(m => m.project_id === activeProject.id)
+    : [];
+  const activeProjMastery = activeProjMasteryRows.length > 0
+    ? Math.round(
+        activeProjMasteryRows.reduce((sum, m) => {
+          const lvl = m.total_attempts > 0
+            ? Math.round((m.correct_attempts / m.total_attempts) * 100)
+            : Number(m.mastery_level || 0);
+          return sum + lvl;
+        }, 0) / activeProjMasteryRows.length
+      )
+    : overallMastery;
+
   const continueLearning = activeProject ? {
     projectId: activeProject.id,
     projectName: activeProject.name,
     spaceId: activeProject.space_id,
     documentTitle: activeDoc?.title || 'Course Materials',
     totalPages: activeDoc?.page_count || 0,
-    overallMastery,
+    overallMastery: activeProjMastery,
     lastStudied: activeProject.updated_at,
   } : null;
 

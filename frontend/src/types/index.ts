@@ -81,6 +81,7 @@ export interface ChatSession {
 
 export interface Citation {
   document_id: string
+  document_title?: string
   page_number: number
   quote: string
 }

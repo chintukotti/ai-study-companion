@@ -171,7 +171,40 @@ router.get('/tutor/sessions/:id/messages', async (req, res, next) => {
       .order('created_at', { ascending: true });
 
     if (error) throw error;
-    res.json(data || []);
+
+    // Hydrate document_title for any older citations that missed it
+    const messages = data || [];
+    const missingDocIds = new Set<string>();
+    messages.forEach((msg: any) => {
+      if (Array.isArray(msg.citations)) {
+        msg.citations.forEach((c: any) => {
+          if (c.document_id && !c.document_title) {
+            missingDocIds.add(c.document_id);
+          }
+        });
+      }
+    });
+
+    if (missingDocIds.size > 0) {
+      const { data: docs } = await supabaseAdmin
+        .from('documents')
+        .select('id, title')
+        .in('id', Array.from(missingDocIds));
+
+      if (docs) {
+        const titleMap = new Map(docs.map(d => [d.id, d.title]));
+        messages.forEach((msg: any) => {
+          if (Array.isArray(msg.citations)) {
+            msg.citations = msg.citations.map((c: any) => ({
+              ...c,
+              document_title: c.document_title || titleMap.get(c.document_id) || 'Document.pdf',
+            }));
+          }
+        });
+      }
+    }
+
+    res.json(messages);
   } catch (err) {
     next(err);
   }
